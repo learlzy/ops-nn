@@ -7,5 +7,5 @@ add_modules_sources(
     MODE PRIVATE
     DIR ${CMAKE_CURRENT_SOURCE_DIR}
     OPTYPE mod_unsqueeze_cast
-    ACLNNTYPE aclnn
+    ACLNNTYPE aclnn 
 )
