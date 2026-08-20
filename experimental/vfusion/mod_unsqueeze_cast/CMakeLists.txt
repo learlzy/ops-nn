@@ -1,8 +1,9 @@
-
-add_modules_sources(
-    HOSTNAME ${OPHOST_NAME}
-    MODE PRIVATE
-    DIR ${CMAKE_CURRENT_SOURCE_DIR}
-    OPTYPE mod_unsqueeze_cast
-    ACLNNTYPE aclnn
-)
+file(GLOB CURRENT_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)
+if(NOT ENABLE_TEST AND NOT BENCHMARK)
+    list(REMOVE_ITEM CURRENT_DIRS tests)
+endif()
+foreach(SUB_DIR ${CURRENT_DIRS})
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${SUB_DIR}/CMakeLists.txt")
+        add_subdirectory(${SUB_DIR})
+    endif()
+endforeach()

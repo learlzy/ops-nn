@@ -9,7 +9,7 @@ extern "C" __global__ __aicore__ void mod_unsqueeze_cast(
     REGISTER_TILING_DEFAULT(ModUnsqueezeCastTilingData);
     GET_TILING_DATA_WITH_STRUCT(ModUnsqueezeCastTilingData, tilingData, tiling);
 
-    KernelModUnsqueezeCast op;
+    NsModUnsqueezeCast::KernelModUnsqueezeCast op;
     op.Init(x1, x2, y, &tilingData);
     op.Process();
 }
