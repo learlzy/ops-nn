@@ -281,11 +281,10 @@ int main() {
   ret = ComputeCustom(x1Host, x2Val, customOut, stream);
   CHECK_RET(ret == 0, LOG_PRINT("ComputeCustom failed\n"); return ret);
 
-  // std::cout << "Custom output (first 10 elements): ";
-  // for (int i = 0; i < 10; ++i) {
-  //   std::cout << aclFloat16ToFloat(customOut[i]) << " ";
-  // }
-  // std::cout << std::endl;
+  std::cout << "Custom output : ";
+  for (int64_t i = 0; i < total; ++i) {
+    std::cout << i << ":" << aclFloat16ToFloat(customOut[i]) << std::endl;
+  }
 
   // 4. Golden（FmodScalar + Cast）
   ret = ComputeGolden(x1Host, x2Val, goldenOut, stream);
