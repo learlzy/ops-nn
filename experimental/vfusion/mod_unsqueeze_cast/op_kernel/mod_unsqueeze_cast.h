@@ -71,7 +71,9 @@ private:
     __aicore__ inline void CopyIn(uint32_t progress, uint32_t len)
     {
         LocalTensor<int64_t> xLocal = inQueueX.AllocTensor<int64_t>();
-        DataCopy(xLocal, x1Gm[progress * tileLength], len);
+        DataCopyExtParams copyParams{1, static_cast<uint32_t>(len * sizeof(int64_t)), 0, 0, 0};
+        DataCopyPadExtParams<int64_t> padParams{false, 0, 0, 0};
+        DataCopyPad(xLocal, x1Gm[progress * tileLength], copyParams, padParams);
         inQueueX.EnQue(xLocal);
     }
 
@@ -84,10 +86,6 @@ private:
         for (uint32_t i = 0; i < len; ++i) {
             int64_t v = xLocal.GetValue(i);
             int64_t m = v % scalarVal;
-            // 向正数方向调整（与常见框架行为对齐，可按需求修改）
-            if (m < 0) {
-                m += (scalarVal > 0 ? scalarVal : -scalarVal);
-            }
             yLocal.SetValue(i, static_cast<half>(m));
         }
 
@@ -99,7 +97,8 @@ private:
     __aicore__ inline void CopyOut(uint32_t progress, uint32_t len)
     {
         LocalTensor<half> yLocal = outQueueY.DeQue<half>();
-        DataCopy(yGm[progress * tileLength], yLocal, len);
+        DataCopyExtParams copyParams{1, static_cast<uint32_t>(len * sizeof(half)), 0, 0, 0};
+        DataCopyPad(yGm[progress * tileLength], yLocal, copyParams);
         outQueueY.FreeTensor(yLocal);
     }
 

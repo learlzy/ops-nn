@@ -51,8 +51,8 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
   return 0;
 }
 
-void GenerateRandomData(std::vector<int64_t>& x1, int64_t& x2, int64_t total) {
-  std::mt19937 gen(42);
+void GenerateRandomData(std::vector<int64_t>& x1, int64_t& x2, int64_t total, int seed=42) {
+  std::mt19937 gen(seed);
   std::uniform_int_distribution<int64_t> dist(-10000, 10000);
   for (int64_t i = 0; i < total; ++i) {
     x1[i] = dist(gen);
@@ -73,7 +73,7 @@ void GenerateData(std::vector<int64_t>& x1, int64_t& x2, int64_t total, bool fix
   if (fix) {
     GenerateFixData(x1, x2, total);
   } else {
-    GenerateRandomData(x1, x2, total);
+    GenerateRandomData(x1, x2, total, 0);
   }
 }
 
@@ -82,7 +82,7 @@ int ComputeGolden(const std::vector<int64_t>& x1Host,
                   int64_t x2Val,
                   std::vector<aclFloat16>& goldenHost,
                   aclrtStream stream) {
-  const std::vector<int64_t> shape = {8, 300};
+  const std::vector<int64_t> shape = {8, 400};
   const int64_t total = GetShapeSize(shape);
 
   void *x1Device = nullptr, *fmodOutDevice = nullptr, *castOutDevice = nullptr;
@@ -228,9 +228,11 @@ int ComputeCustom(const std::vector<int64_t>& x1Host,
 }
 
 // 精度比对
-bool CompareResult(const std::vector<aclFloat16>& custom,
-                   const std::vector<aclFloat16>& golden,
-                   float atol = 1e-3f, float rtol = 1e-3f) {
+bool CompareResult(const std::vector<int64_t>& x1Host,
+                  const int64_t x2Val, 
+                  const std::vector<aclFloat16>& custom,
+                  const std::vector<aclFloat16>& golden,
+                  float atol = 1e-3f, float rtol = 1e-3f) {
   size_t total = custom.size();
   size_t failCnt = 0;
   float maxAbsErr = 0.0f;
@@ -243,8 +245,8 @@ bool CompareResult(const std::vector<aclFloat16>& custom,
     if (absErr > maxAbsErr) maxAbsErr = absErr;
     if (absErr > atol && relErr > rtol) {
       if (failCnt < 10) {
-        LOG_PRINT("Mismatch at %zu: custom=%.6f, golden=%.6f, abs=%.6f, rel=%.6f\n",
-                  i, c, g, absErr, relErr);
+        LOG_PRINT("Mismatch at %zu: host=%ld, divisor=%ld, custom=%.6f, golden=%.6f, abs=%.6f, rel=%.6f\n",
+                  i, x1Host[i], x2Val, c, g, absErr, relErr);
       }
       failCnt++;
     }
@@ -271,7 +273,7 @@ int main() {
   const int64_t total = GetShapeSize(shape);
   std::vector<int64_t> x1Host(total);
   int64_t x2Val = 0;
-  GenerateData(x1Host, x2Val, total);
+  GenerateData(x1Host, x2Val, total, false);
   LOG_PRINT("Test case: shape=[%ld,%ld], x2 scalar = %ld\n", shape[0], shape[1], x2Val);
 
   std::vector<aclFloat16> customOut(total);
@@ -281,17 +283,12 @@ int main() {
   ret = ComputeCustom(x1Host, x2Val, customOut, stream);
   CHECK_RET(ret == 0, LOG_PRINT("ComputeCustom failed\n"); return ret);
 
-  std::cout << "Custom output : ";
-  for (int64_t i = 0; i < total; ++i) {
-    std::cout << i << ":" << aclFloat16ToFloat(customOut[i]) << std::endl;
-  }
-
   // 4. Golden（FmodScalar + Cast）
   ret = ComputeGolden(x1Host, x2Val, goldenOut, stream);
   CHECK_RET(ret == 0, LOG_PRINT("ComputeGolden failed\n"); return ret);
 
   // 5. 精度比对
-  bool pass = CompareResult(customOut, goldenOut);
+  bool pass = CompareResult(x1Host, x2Val, customOut, goldenOut);
   if (pass) {
     LOG_PRINT("\n[SUCCESS] Precision verification passed!\n");
   } else {
