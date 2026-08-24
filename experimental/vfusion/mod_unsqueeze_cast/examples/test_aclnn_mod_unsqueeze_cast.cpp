@@ -79,10 +79,10 @@ void GenerateData(std::vector<int64_t>& x1, int64_t& x2, int64_t total, bool fix
 
 // 使用原生 aclnnFmodScalar + aclnnCast 计算 golden
 int ComputeGolden(const std::vector<int64_t>& x1Host,
+                  const std::vector<int64_t>& shape,
                   int64_t x2Val,
                   std::vector<aclFloat16>& goldenHost,
                   aclrtStream stream) {
-  const std::vector<int64_t> shape = {8, 400};
   const int64_t total = GetShapeSize(shape);
 
   void *x1Device = nullptr, *fmodOutDevice = nullptr, *castOutDevice = nullptr;
@@ -162,18 +162,23 @@ int ComputeGolden(const std::vector<int64_t>& x1Host,
   aclrtFree(x1Device);
   aclrtFree(fmodOutDevice);
   aclrtFree(castOutDevice);
-  // if (workspaceAddr) aclrtFree(workspaceAddr);
+  if (workspaceAddr) aclrtFree(workspaceAddr);
 
   return 0;
 }
 
 // 调用自定义算子 ModUnsqueezeCast
 int ComputeCustom(const std::vector<int64_t>& x1Host,
+                  const std::vector<int64_t>& shape,
                   int64_t x2Val,
                   std::vector<aclFloat16>& outHost,
                   aclrtStream stream) {
-  const std::vector<int64_t> shapeIn  = {8, 300};
-  const std::vector<int64_t> shapeOut = {8, 300, 1};  // unsqueeze 后的 shape
+  const std::vector<int64_t> shapeIn  = shape;
+  const std::vector<int64_t> shapeOut = [&shapeIn]() {
+    auto tmp = shapeIn;
+    tmp.push_back(int64_t{1});
+    return tmp;
+  }();
   const int64_t total = GetShapeSize(shapeIn);
 
   void *x1Device = nullptr, *x2Device = nullptr, *yDevice = nullptr;
@@ -280,20 +285,20 @@ int main() {
   std::vector<aclFloat16> goldenOut(total);
 
   // 3. 自定义算子
-  ret = ComputeCustom(x1Host, x2Val, customOut, stream);
+  ret = ComputeCustom(x1Host, shape, x2Val, customOut, stream);
   CHECK_RET(ret == 0, LOG_PRINT("ComputeCustom failed\n"); return ret);
 
   // 4. Golden（FmodScalar + Cast）
-  ret = ComputeGolden(x1Host, x2Val, goldenOut, stream);
+  ret = ComputeGolden(x1Host, shape, x2Val, goldenOut, stream);
   CHECK_RET(ret == 0, LOG_PRINT("ComputeGolden failed\n"); return ret);
 
-  // // 5. 精度比对
-  // bool pass = CompareResult(x1Host, x2Val, customOut, goldenOut);
-  // if (pass) {
-  //   LOG_PRINT("\n[SUCCESS] Precision verification passed!\n");
-  // } else {
-  //   LOG_PRINT("\n[FAILED] Precision verification failed!\n");
-  // }
+  // 5. 精度比对
+  bool pass = CompareResult(x1Host, x2Val, customOut, goldenOut);
+  if (pass) {
+    LOG_PRINT("\n[SUCCESS] Precision verification passed!\n");
+  } else {
+    LOG_PRINT("\n[FAILED] Precision verification failed!\n");
+  }
 
   // 6. 清理
   aclrtDestroyStream(stream);
