@@ -64,7 +64,7 @@ void GenerateRandomData(std::vector<int64_t>& x1, int64_t& x2, int64_t total) {
 
 void GenerateFixData(std::vector<int64_t>& x1, int64_t& x2, int64_t total) {
   for (int64_t i = 0; i < total; ++i) {
-    x1[i] = 3;
+    x1[i] = 5;
   }
   x2 = 2;
 }
@@ -281,11 +281,11 @@ int main() {
   ret = ComputeCustom(x1Host, x2Val, customOut, stream);
   CHECK_RET(ret == 0, LOG_PRINT("ComputeCustom failed\n"); return ret);
 
-  // std::cout << "Custom output (first 10 elements): ";
-  // for (int i = 0; i < 10; ++i) {
-  //   std::cout << customOut[i] << " ";
-  // }
-  // std::cout << std::endl;
+  std::cout << "Custom output (first 10 elements): ";
+  for (int i = 0; i < 10; ++i) {
+    std::cout << aclFloat16ToFloat(customOut[i]) << " ";
+  }
+  std::cout << std::endl;
 
   // // 4. Golden（FmodScalar + Cast）
   // ret = ComputeGolden(x1Host, x2Val, goldenOut, stream);
