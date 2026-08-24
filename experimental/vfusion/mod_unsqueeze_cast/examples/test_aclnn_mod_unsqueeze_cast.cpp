@@ -287,23 +287,22 @@ int main() {
   }
   std::cout << std::endl;
 
-  // // 4. Golden（FmodScalar + Cast）
-  // ret = ComputeGolden(x1Host, x2Val, goldenOut, stream);
-  // CHECK_RET(ret == 0, LOG_PRINT("ComputeGolden failed\n"); return ret);
+  // 4. Golden（FmodScalar + Cast）
+  ret = ComputeGolden(x1Host, x2Val, goldenOut, stream);
+  CHECK_RET(ret == 0, LOG_PRINT("ComputeGolden failed\n"); return ret);
 
-  // // 5. 精度比对
-  // bool pass = CompareResult(customOut, goldenOut);
-  // if (pass) {
-  //   LOG_PRINT("\n[SUCCESS] Precision verification passed!\n");
-  // } else {
-  //   LOG_PRINT("\n[FAILED] Precision verification failed!\n");
-  // }
+  // 5. 精度比对
+  bool pass = CompareResult(customOut, goldenOut);
+  if (pass) {
+    LOG_PRINT("\n[SUCCESS] Precision verification passed!\n");
+  } else {
+    LOG_PRINT("\n[FAILED] Precision verification failed!\n");
+  }
 
   // 6. 清理
   aclrtDestroyStream(stream);
   aclrtResetDevice(deviceId);
   aclFinalize();
 
-  // return pass ? 0 : 1;
-  return 0;
+  return pass ? 0 : 1;
 }
