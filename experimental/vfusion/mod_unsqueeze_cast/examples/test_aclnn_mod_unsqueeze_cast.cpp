@@ -236,8 +236,8 @@ bool CompareResult(const std::vector<aclFloat16>& custom,
   float maxAbsErr = 0.0f;
 
   for (size_t i = 0; i < total; ++i) {
-    float c = static_cast<float>(custom[i]);
-    float g = static_cast<float>(golden[i]);
+    float c = aclFloat16ToFloat(custom[i]);
+    float g = aclFloat16ToFloat(golden[i]);
     float absErr = std::fabs(c - g);
     float relErr = absErr / (std::fabs(g) + 1e-8f);
     if (absErr > maxAbsErr) maxAbsErr = absErr;
