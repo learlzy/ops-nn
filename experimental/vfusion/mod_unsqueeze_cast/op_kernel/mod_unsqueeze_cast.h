@@ -71,9 +71,6 @@ private:
         LocalTensor<half>    yLocal = outQueueY.AllocTensor<half>();
         LocalTensor<float>   tmpLocal = tmpBuf.Get<float>();
 
-        // 1. int64 mod（标量）
-        // Ascend C 对 int64 的向量 mod 支持有限，这里用标量循环保证正确性
-        // （数据量小 [8,300]=2400，性能可接受；若后续要极致性能可换 int32 路径）
         for (uint32_t i = 0; i < len; ++i) {
             int64_t v = xLocal.GetValue(i);
             int64_t m = v % scalarVal;
@@ -81,11 +78,34 @@ private:
             if (m < 0) {
                 m += (scalarVal > 0 ? scalarVal : -scalarVal);
             }
+
+            // for debug
+            if (GetBlockIdx() == 0 && i < 10) {
+                // 前 10 个元素打印调试
+                printf("x1[%u]=%ld, x2=%ld, mod=%ld\n", i, v, scalarVal, m);
+            }
+
+
             tmpLocal.SetValue(i, static_cast<float>(m));
         }
 
-        // 2. float -> half
+        //float -> half
         Cast(yLocal, tmpLocal, RoundMode::CAST_NONE, len);
+
+        // for debug
+        if (GetBlockIdx() == 0) {
+            printf("tmpLocal (first 10 elements): ");
+            for (uint32_t i = 0; i < (len < 10 ? len : 10); ++i) {
+                printf("%f ", tmpLocal.GetValue(i));
+            }
+            printf("\n");
+
+            printf("y (first 10 elements): ");
+            for (uint32_t i = 0; i < (len < 10 ? len : 10); ++i) {
+                printf("%f ", static_cast<float>(yLocal.GetValue(i)));
+            }
+            printf("\n");
+        }
 
         outQueueY.EnQue<half>(yLocal);
         inQueueX.FreeTensor(xLocal);
