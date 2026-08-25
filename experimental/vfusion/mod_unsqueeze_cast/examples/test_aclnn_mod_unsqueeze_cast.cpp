@@ -10,7 +10,6 @@
 #include <acl/acl.h>
 #include "aclnnop/aclnn_fmod_scalar.h"   // 标量取模
 #include "aclnnop/aclnn_cast.h"           // 类型转换
-// 自定义算子头文件（根据实际生成路径调整）
 #include "aclnn_mod_unsqueeze_cast.h"
 
 #define CHECK_RET(cond, return_expr) \
