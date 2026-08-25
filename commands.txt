@@ -1,0 +1,42 @@
+--------------------------mod_unsqueeze_cast--------------------------------------
+编译：
+bash build.sh --pkg --experimental --soc=ascend910b --vendor_name=custom --ops=mod_unsqueeze_cast
+
+安装：
+./build_out/cann-ops-nn-custom-linux.aarch64.run
+
+设置环境变量：
+export LD_LIBRARY_PATH=/home/developer/Ascend/cann-9.0.0/opp/vendors/custom_nn/op_api/lib/:${LD_LIBRARY_PATH} 
+
+运行(aclnn)：
+bash build.sh --run_example mod_unsqueeze_cast eager cust \
+--experimental --example_name=mod_unsqueeze_cast --vendor_name=custom
+
+运行(graph):
+bash build.sh --run_example mod_unsqueeze_cast graph cust \
+--experimental --example_name=mod_unsqueeze_cast --vendor_name=custom
+
+卸载：
+bash ${ASCEND_HOME_PATH}/opp/vendors/custom_nn/scripts/uninstall.sh
+
+debug专用环境变量：
+export ASCEND_SLOG_PRINT_TO_STDOUT=3
+export ASCEND_GLOBAL_LOG_LEVEL=0
+
+
+--------------------------gelu_quant--------------------------------------
+编译：
+bash build.sh --pkg --soc=ascend910b --vendor_name=custom --ops=gelu_quant
+
+安装：
+./build_out/cann-ops-nn-custom-linux.aarch64.run
+
+设置环境变量：
+export LD_LIBRARY_PATH=/home/developer/Ascend/cann-9.0.0/opp/vendors/custom_nn/op_api/lib/:${LD_LIBRARY_PATH} 
+
+运行(graph):
+bash build.sh --run_example gelu_quant graph cust \
+--example_name=gelu_quant --vendor_name=custom
+
+卸载：
+bash ${ASCEND_HOME_PATH}/opp/vendors/custom_nn/scripts/uninstall.sh
