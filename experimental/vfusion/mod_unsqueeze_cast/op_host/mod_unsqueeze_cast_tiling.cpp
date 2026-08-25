@@ -17,7 +17,7 @@ static ge::graphStatus TilingFunc(gert::TilingContext* context)
     }
     tiling->size = static_cast<uint32_t>(data_sz);
 
-    constexpr uint32_t BLOCK_DIM = 8;
+    constexpr uint32_t BLOCK_DIM = 4;
     context->SetBlockDim(BLOCK_DIM);
     tiling->blockLength = (tiling->size + BLOCK_DIM - 1) / BLOCK_DIM;
     tiling->tileNum = (tiling->blockLength + TILE_SIZE - 1) / TILE_SIZE;   // TILE_SIZE=256
