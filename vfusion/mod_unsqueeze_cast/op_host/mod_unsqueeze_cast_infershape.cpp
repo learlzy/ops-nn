@@ -44,8 +44,10 @@ static ge::graphStatus InferDataTypeModUnsqueezeCast(gert::InferDataTypeContext*
 
     // 设置输出的数据类型
     // ModUnsqueezeCast算子的输出数据类型固定为float16
-    const ge::DataType sizeDtype = ge::DT_FLOAT16;
-    context->SetOutputDataType(IDX_0, sizeDtype);
+    auto inputDtype = context->GetInputDataType(IDX_0);
+    const ge::DataType outDtype = inputDtype == ge::DT_INT64 ? 
+        ge::DT_FLOAT16 : inputDtype;
+    context->SetOutputDataType(IDX_0, outDtype);
 
     OP_LOGD(context->GetNodeName(), "End to do InferDataTypeModUnsqueezeCast");
     return GRAPH_SUCCESS;

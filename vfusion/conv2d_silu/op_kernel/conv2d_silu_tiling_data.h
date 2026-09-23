@@ -9,23 +9,16 @@
  */
 
 /*!
- * \file add_example_proto.h
- * \brief
+ * \file conv2d_silu_tiling_data.h
+ * \brief tiling data struct
  */
-#ifndef OPS_OP_PROTO_INC_AddEXAMPLE_H_
-#define OPS_OP_PROTO_INC_AddEXAMPLE_H_
 
-#include "graph/operator_reg.h"
-#include "graph/types.h"
+#ifndef __CONV2D_SILU_TILLING_DATA_H__
+#define __CONV2D_SILU_TILLING_DATA_H__
 
-namespace ge {
-REG_OP(ModUnsqueezeCast)
-    .INPUT(x1, TensorType({DT_INT64, DT_FLOAT}))
-    .INPUT(x2, TensorType({DT_INT64, DT_FLOAT}))
-    .OUTPUT(y, TensorType({DT_FLOAT16, DT_FLOAT}))
-    .OP_END_FACTORY_REG(ModUnsqueezeCast)
-
-} // namespace ge
-
-#endif // OPS_OP_PROTO_INC_AddEXAMPLE_H_
-
+struct Conv2dSiluTilingData {
+    int64_t totalLength;
+    int64_t tileNum;
+    // 扩展其他tilling参数
+};
+#endif
