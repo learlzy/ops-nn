@@ -13,8 +13,8 @@ add_modules_sources(HOSTNAME ${OPHOST_NAME} MODE PRIVATE DIR ${CMAKE_CURRENT_SOU
 # ============================================================
 # 添加 catlass 头文件路径（关键修改点）
 # ============================================================
-catlass 放在 ops-nn 根目录下的 third_party/catlass，也可以写成相对路径：
-# set(CATLASS_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/catlass/include" CACHE PATH "Catlass include directory")
+# catlass 放在 ops-nn 根目录下的 third_party/catlass，也可以写成相对路径：
+set(CATLASS_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/catlass/include" CACHE PATH "Catlass include directory")
 
 # ============================================================
 # 把 catlass 路径注入到本算子的 Kernel 编译选项中
