@@ -7,9 +7,8 @@ namespace NsConv2dSilu {
     using namespace Catlass::Conv::Kernel;
     using namespace Catlass::Epilogue;
 
-    template<typename ElementType>
+    template<typename ElementType, typename ElementAccumulator>
     struct Conv2dSiluKernelTraits {
-        using ElementAccumulator = half;
         using ElementFmap = ElementType;
         using ElementFilter = ElementType;
         using ElementBias = ElementType;

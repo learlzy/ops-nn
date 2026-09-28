@@ -34,7 +34,7 @@ static uint64_t GetTilingKeyByDtype(ge::DataType dtype)
 }
 
 // todo: 从context中获取真实的形状和参数
-template <typename T>
+template <typename ElementType, typename ElementAccumulator>
 static size_t GetWorkspaceSize(gert::TilingContext* context)
 {
     uint32_t dataSizes[5] = {2, 33, 43, 112, 80}; // {batch, hi, wi, cin, cout}
@@ -45,7 +45,7 @@ static size_t GetWorkspaceSize(gert::TilingContext* context)
     int32_t deviceId{0};
     Catlass::Conv2dParams problemParams = Catlass::Conv2dParams::MakeConv2dParams(
         dataSizes, filterSizes, pads, strides, dilations);
-    using Conv2dSiluKernel = NsConv2dSilu::Conv2dSiluKernelTraits<T>::Conv2dKernel;
+    using Conv2dSiluKernel = NsConv2dSilu::Conv2dSiluKernelTraits<ElementType, ElementAccumulator>::Conv2dKernel;
     Conv2dSiluKernel::Arguments args(problemParams, nullptr, nullptr, nullptr, nullptr);
     return Conv2dSiluKernel::GetWorkspaceSize(args);
 }
@@ -64,9 +64,9 @@ static ge::graphStatus Conv2dSiluTilingFunc(gert::TilingContext* context)
     // 算子自身业务需要的workspace
     size_t usrWorkspaceSize = 0;
     if (dtype == ge::DT_FLOAT16) {
-        usrWorkspaceSize = GetWorkspaceSize<half>(context);
+        usrWorkspaceSize = GetWorkspaceSize<half, half>(context);
     } else {
-        usrWorkspaceSize = GetWorkspaceSize<float>(context);
+        usrWorkspaceSize = GetWorkspaceSize<float, float>(context);
     }
     // 设置总workspace大小：系统+用户之和
     size_t* ws = context->GetWorkspaceSizes(1);

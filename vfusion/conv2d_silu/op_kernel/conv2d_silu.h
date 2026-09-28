@@ -30,8 +30,8 @@
 
 namespace NsConv2dSilu {
 
-template<typename ElementType>
-struct Conv2dSiluKernel : Conv2dSiluKernelTraits<ElementType> {
+template<typename ElementType, typename ElementAccumulator>
+struct Conv2dSiluKernel : Conv2dSiluKernelTraits<ElementType, ElementAccumulator> {
 public:
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR filter, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
     const Conv2dSiluTilingData* tiling) 
