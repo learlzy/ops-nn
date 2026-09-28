@@ -10,13 +10,15 @@
 
 /*!
  * \file conv2d_silu_tiling.cpp
- * \brief Tiling for Conv2dSilu, support FP16 / BF16 / FP32
+ * \brief Tiling for Conv2dSilu, support FP16 / FP32
+ *        直接使用 Conv2dEpilogue::GetWorkspaceSize，不使用 Adapter
  */
 
 #include "log/log.h"
 #include "util/math_util.h"
 #include "op_host/tiling_util.h"
 #include "op_host/tiling_templates_registry.h"
+#include "platform/platform_ascendc.h"
 #include "conv2d_silu/op_kernel/conv2d_silu_tiling_data.h"
 #include "conv2d_silu/op_kernel/conv2d_silu_tiling_key.h"
 #include "conv2d_silu/op_kernel/conv2d_silu_kernel_template.h"
@@ -33,44 +35,133 @@ static uint64_t GetTilingKeyByDtype(ge::DataType dtype)
     return static_cast<uint64_t>(CONV2D_SILU_SCH_FP32);
 }
 
-// todo: 从context中获取真实的形状和参数
 template <typename ElementType, typename ElementAccumulator>
-static size_t GetWorkspaceSize(gert::TilingContext* context)
+static size_t CalcWorkspaceSize(const Catlass::Conv2dParams& problemParams)
 {
-    uint32_t dataSizes[5] = {2, 33, 43, 112, 80}; // {batch, hi, wi, cin, cout}
-    uint8_t filterSizes[2] = {3, 3};              // {kh, kw}
-    uint8_t pads[4] = {2, 2, 2, 2};               // {padLeft, padRight, padTop, padBottom}
-    uint8_t strides[2] = {1, 1};                  // {strideH, strideW}
-    uint8_t dilations[2] = {1, 1};                // {dilationH, dilationW}
-    int32_t deviceId{0};
-    Catlass::Conv2dParams problemParams = Catlass::Conv2dParams::MakeConv2dParams(
-        dataSizes, filterSizes, pads, strides, dilations);
-    using Conv2dSiluKernel = NsConv2dSilu::Conv2dSiluKernelTraits<ElementType, ElementAccumulator>::Conv2dKernel;
-    Conv2dSiluKernel::Arguments args(problemParams, nullptr, nullptr, nullptr, nullptr);
-    return Conv2dSiluKernel::GetWorkspaceSize(args);
+    using Conv2dKernel = typename NsConv2dSilu::Conv2dSiluKernelTraits<ElementType, ElementAccumulator>::Conv2dKernel;
+    typename Conv2dKernel::Arguments args{problemParams, nullptr, nullptr, nullptr, nullptr};
+    return Conv2dKernel::GetWorkspaceSize(args);
 }
 
 static ge::graphStatus Conv2dSiluTilingFunc(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin Conv2dSiluTilingFunc");
-    auto* xDesc = context->GetInputDesc(0);
-    ge::DataType dtype = xDesc->GetDataType();
-    context->SetTilingKey(GetTilingKeyByDtype(dtype));
 
-    // 获取平台对象
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
-    // 获取系统workspace大小
-    size_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-    // 算子自身业务需要的workspace
+    auto* xDesc = context->GetInputDesc(0);
+    OP_CHECK_NULL_WITH_CONTEXT(context, xDesc);
+    ge::DataType dtype = xDesc->GetDataType();
+
+    const gert::StorageShape* xShape = context->GetInputShape(0);
+    const gert::StorageShape* filterShape = context->GetInputShape(1);
+    OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
+    OP_CHECK_NULL_WITH_CONTEXT(context, filterShape);
+
+    const auto* attrs = context->GetAttrs();
+    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+
+    const gert::ContinuousVector* stridesPtr = attrs->GetAttrPointer<gert::ContinuousVector>(0);
+    const gert::ContinuousVector* padsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(1);
+    const gert::ContinuousVector* dilationsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(2);
+    OP_CHECK_NULL_WITH_CONTEXT(context, stridesPtr);
+    OP_CHECK_NULL_WITH_CONTEXT(context, padsPtr);
+    OP_CHECK_NULL_WITH_CONTEXT(context, dilationsPtr);
+
+    const int64_t* strides = reinterpret_cast<const int64_t*>(stridesPtr->GetData());
+    const int64_t* pads = reinterpret_cast<const int64_t*>(padsPtr->GetData());
+    const int64_t* dilations = reinterpret_cast<const int64_t*>(dilationsPtr->GetData());
+
+    int64_t strideH = (stridesPtr->GetSize() >= 3) ? strides[2] : strides[0];
+    int64_t strideW = (stridesPtr->GetSize() >= 4) ? strides[3] : strides[1];
+    int64_t dilH = (dilationsPtr->GetSize() >= 3) ? dilations[2] : dilations[0];
+    int64_t dilW = (dilationsPtr->GetSize() >= 4) ? dilations[3] : dilations[1];
+
+    int64_t padTop = 0, padBottom = 0, padLeft = 0, padRight = 0;
+    if (padsPtr->GetSize() >= 4) {
+        padTop = pads[0];
+        padBottom = pads[1];
+        padLeft = pads[2];
+        padRight = pads[3];
+    }
+
+    const auto& xDims = xShape->GetStorageShape();
+    const auto& fDims = filterShape->GetStorageShape();
+
+    uint32_t batch = static_cast<uint32_t>(xDims.GetDim(0));
+    uint32_t hi = static_cast<uint32_t>(xDims.GetDim(2));
+    uint32_t wi = static_cast<uint32_t>(xDims.GetDim(3));
+    uint32_t cin = static_cast<uint32_t>(xDims.GetDim(1));
+    uint32_t cout = static_cast<uint32_t>(fDims.GetDim(0));
+    uint32_t kh = static_cast<uint32_t>(fDims.GetDim(2));
+    uint32_t kw = static_cast<uint32_t>(fDims.GetDim(3));
+
+    uint32_t dataSizes[5] = {batch, hi, wi, cin, cout};
+    uint8_t filterSizes[2] = {static_cast<uint8_t>(kh), static_cast<uint8_t>(kw)};
+    uint8_t padsArr[4] = {
+        static_cast<uint8_t>(padLeft),
+        static_cast<uint8_t>(padRight),
+        static_cast<uint8_t>(padTop),
+        static_cast<uint8_t>(padBottom)
+    };
+    uint8_t stridesArr[2] = {static_cast<uint8_t>(strideH), static_cast<uint8_t>(strideW)};
+    uint8_t dilationsArr[2] = {static_cast<uint8_t>(dilH), static_cast<uint8_t>(dilW)};
+
+    Catlass::Conv2dParams problemParams =
+        Catlass::Conv2dParams::MakeConv2dParams(dataSizes, filterSizes, padsArr, stridesArr, dilationsArr);
+
+    // 填充 tiling data
+    Conv2dSiluTilingData* tilingData = context->GetTilingData<Conv2dSiluTilingData>();
+    OP_CHECK_NULL_WITH_CONTEXT(context, tilingData);
+
+    tilingData->batch = batch;
+    tilingData->hi = hi;
+    tilingData->wi = wi;
+    tilingData->cin = cin;
+    tilingData->cout = cout;
+    tilingData->kh = kh;
+    tilingData->kw = kw;
+    tilingData->padLeft = static_cast<uint32_t>(padLeft);
+    tilingData->padRight = static_cast<uint32_t>(padRight);
+    tilingData->padTop = static_cast<uint32_t>(padTop);
+    tilingData->padBottom = static_cast<uint32_t>(padBottom);
+    tilingData->strideH = static_cast<uint32_t>(strideH);
+    tilingData->strideW = static_cast<uint32_t>(strideW);
+    tilingData->dilationH = static_cast<uint32_t>(dilH);
+    tilingData->dilationW = static_cast<uint32_t>(dilW);
+
+    tilingData->ho = problemParams.ho();
+    tilingData->wo = problemParams.wo();
+    tilingData->cin1 = problemParams.cin1();
+    tilingData->cout1 = problemParams.cout1();
+    tilingData->coutRound = problemParams.coutRound();
+    tilingData->c0 = problemParams.C0;
+
+    // 计算 workspace
     size_t usrWorkspaceSize = 0;
     if (dtype == ge::DT_FLOAT16) {
-        usrWorkspaceSize = GetWorkspaceSize<half, half>(context);
+        usrWorkspaceSize = CalcWorkspaceSize<half, half>(problemParams);
     } else {
-        usrWorkspaceSize = GetWorkspaceSize<float, float>(context);
+        usrWorkspaceSize = CalcWorkspaceSize<float, float>(problemParams);
     }
-    // 设置总workspace大小：系统+用户之和
+    tilingData->workspaceSize = static_cast<uint64_t>(usrWorkspaceSize);
+
+    // tiling key
+    context->SetTilingKey(GetTilingKeyByDtype(dtype));
+
+    // block dim（简单按核数设置，实际可更精细）
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+    uint32_t aicCoreNum = ascendcPlatform.GetCoreNumAic();
+    context->SetBlockDim(aicCoreNum);
+
+    // workspace：系统 + 用户
+    size_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     size_t* ws = context->GetWorkspaceSizes(1);
+    OP_CHECK_NULL_WITH_CONTEXT(context, ws);
     ws[0] = sysWorkspaceSize + usrWorkspaceSize;
+
+    OP_LOGD(context->GetNodeName(),
+            "Tiling done: batch=%u hi=%u wi=%u cin=%u cout=%u ho=%u wo=%u workspace=%lu",
+            tilingData->batch, tilingData->hi, tilingData->wi, tilingData->cin, tilingData->cout,
+            tilingData->ho, tilingData->wo, tilingData->workspaceSize);
 
     return ge::GRAPH_SUCCESS;
 }

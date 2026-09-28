@@ -11,7 +11,8 @@
 /*!
  * \file conv2d_silu.cpp
  * \brief Kernel entry: Conv2d + Bias + SiLU (Catlass)
- *        schMode: 0=FP16, 1=BF16, 2=FP32
+ *        schMode: 0=FP16, 1=FP32
+ *        直接调用 Conv2dEpilogue，不使用 Adapter，不处理 hardwareSyncAddr
  */
 
 #include "conv2d_silu.h"
@@ -25,8 +26,12 @@ __global__ __aicore__ void conv2d_silu(
     GET_TILING_DATA_WITH_STRUCT(Conv2dSiluTilingData, tilingData, tiling);
 
     if constexpr (schMode == CONV2D_SILU_SCH_FP16) {
-        
+        NsConv2dSilu::Conv2dSiluKernel<half, half> op;
+        op.Init(x, filter, bias, y, workspace, &tilingData);
+        op.Process();
     } else if constexpr (schMode == CONV2D_SILU_SCH_FP32) {
-        
+        NsConv2dSilu::Conv2dSiluKernel<float, float> op;
+        op.Init(x, filter, bias, y, workspace, &tilingData);
+        op.Process();
     }
 }

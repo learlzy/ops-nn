@@ -11,7 +11,8 @@
 /*!
  * \file conv2d_silu.h
  * \brief Catlass-based Conv2d + Bias + SiLU kernel (Atlas A2)
- *        Support Element type: half / bfloat16_t / float
+ *        Support Element type: half / float
+ *        直接调用 Conv2dEpilogue，不使用 DeviceConv Adapter，不处理 hardwareSyncAddr
  */
 
 #ifndef __CONV2D_SILU_H__
@@ -27,40 +28,87 @@
 #include "conv2d_silu_tiling_key.h"
 #include "conv2d_silu_kernel_template.h"
 
-
 namespace NsConv2dSilu {
 
-template<typename ElementType, typename ElementAccumulator>
-struct Conv2dSiluKernel : Conv2dSiluKernelTraits<ElementType, ElementAccumulator> {
-public:
-    __aicore__ inline void Init(GM_ADDR x, GM_ADDR filter, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-    const Conv2dSiluTilingData* tiling) 
-    {
-        // 告诉框架这是系统 workspace（含硬件同步相关区域）
-        SetSysWorkspace(workspace);
-        // 用户自己用的中间结果区域
-        GM_ADDR userWs = GetUserWorkspace(workspace);
+using namespace AscendC;
+using namespace Catlass;
+using namespace Catlass::Conv::Kernel;
 
-        GET_TILING_DATA(tilingData, tiling);
+template <typename ElementType, typename ElementAccumulator>
+class Conv2dSiluKernel {
+public:
+    using Traits = Conv2dSiluKernelTraits<ElementType, ElementAccumulator>;
+    using Conv2dKernel = typename Traits::Conv2dKernel;
+    using Arguments = typename Conv2dKernel::Arguments;
+    using Params = typename Conv2dKernel::Params;
+
+    __aicore__ inline Conv2dSiluKernel() {}
+
+    __aicore__ inline void Init(
+        GM_ADDR x, GM_ADDR filter, GM_ADDR bias, GM_ADDR y,
+        GM_ADDR workspace, const Conv2dSiluTilingData* tiling)
+    {
+        // 系统 workspace（框架分配，含同步区等）
+        SetSysWorkspace(workspace);
+        // 用户自己的中间结果区域（AIC 写 / AIV 读）
+        userWorkspace_ = GetUserWorkspace(workspace);
+
+        tilingData_ = tiling;
+
+        // 构造 Conv2dParams
+        problemParams_ = MakeProblemParams(tilingData_);
+
+        // 构造 Arguments
+        args_.problemShape = problemParams_;
+        args_.ptrFmap = x;
+        args_.ptrFilter = filter;
+        args_.ptrBias = bias;
+        args_.ptrOutput = y;
+
+        // 转成底层 Params（内部会填充 layout 和 epilogueParams）
+        params_ = Conv2dKernel::ToUnderlyingArguments(args_, reinterpret_cast<uint8_t*>(userWorkspace_));
     }
 
     __aicore__ inline void Process()
-    {}
+    {
+        // 直接实例化并调用 Conv2dEpilogue
+        Conv2dKernel kernel;
+        kernel(params_);
+    }
 
 private:
     __aicore__ inline Catlass::Conv2dParams MakeProblemParams(const Conv2dSiluTilingData* t)
     {
         uint32_t dataSizes[5] = {t->batch, t->hi, t->wi, t->cin, t->cout};
-        uint8_t filterSizes[2] = {static_cast<uint8_t>(t->kh), static_cast<uint8_t>(t->kw)};
+        uint8_t filterSizes[2] = {
+            static_cast<uint8_t>(t->kh),
+            static_cast<uint8_t>(t->kw)
+        };
         uint8_t pads[4] = {
-            static_cast<uint8_t>(t->padLeft), static_cast<uint8_t>(t->padRight),
-            static_cast<uint8_t>(t->padTop), static_cast<uint8_t>(t->padBottom)};
-        uint8_t strides[2] = {static_cast<uint8_t>(t->strideH), static_cast<uint8_t>(t->strideW)};
-        uint8_t dilations[2] = {static_cast<uint8_t>(t->dilationH), static_cast<uint8_t>(t->dilationW)};
+            static_cast<uint8_t>(t->padLeft),
+            static_cast<uint8_t>(t->padRight),
+            static_cast<uint8_t>(t->padTop),
+            static_cast<uint8_t>(t->padBottom)
+        };
+        uint8_t strides[2] = {
+            static_cast<uint8_t>(t->strideH),
+            static_cast<uint8_t>(t->strideW)
+        };
+        uint8_t dilations[2] = {
+            static_cast<uint8_t>(t->dilationH),
+            static_cast<uint8_t>(t->dilationW)
+        };
         return Catlass::Conv2dParams::MakeConv2dParams(dataSizes, filterSizes, pads, strides, dilations);
     }
+
+private:
+    const Conv2dSiluTilingData* tilingData_{nullptr};
+    GM_ADDR userWorkspace_{nullptr};
+    Catlass::Conv2dParams problemParams_{};
+    Arguments args_{};
+    Params params_{};
 };
 
 } // namespace NsConv2dSilu
 
-#endif
+#endif // __CONV2D_SILU_H__
