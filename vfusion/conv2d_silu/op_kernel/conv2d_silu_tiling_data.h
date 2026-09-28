@@ -10,15 +10,16 @@
 
 /*!
  * \file conv2d_silu_tiling_data.h
- * \brief tiling data struct
+ * \brief Tiling data for Conv2dSilu
  */
 
-#ifndef __CONV2D_SILU_TILLING_DATA_H__
-#define __CONV2D_SILU_TILLING_DATA_H__
+#ifndef __CONV2D_SILU_TILING_DATA_H__
+#define __CONV2D_SILU_TILING_DATA_H__
+
+#include <cstdint>
 
 struct Conv2dSiluTilingData {
-    int64_t totalLength;
-    int64_t tileNum;
-    // 扩展其他tilling参数
+    
 };
-#endif
+
+#endif // __CONV2D_SILU_TILING_DATA_H__

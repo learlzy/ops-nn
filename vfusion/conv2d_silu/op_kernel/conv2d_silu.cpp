@@ -10,34 +10,23 @@
 
 /*!
  * \file conv2d_silu.cpp
- * \brief
+ * \brief Kernel entry: Conv2d + Bias + SiLU (Catlass)
+ *        schMode: 0=FP16, 1=BF16, 2=FP32
  */
 
 #include "conv2d_silu.h"
 
-enum class Conv2dSiluTilingKey : uint32_t
-{
-    TILING_KEY_EXAMPLE_FLOAT = 0,
-    TILING_KEY_EXAMPLE_INT32 = 1,
-};
-
 template <uint32_t schMode>
-__global__ __aicore__ void conv2d_silu(GM_ADDR x, GM_ADDR y, GM_ADDR z, GM_ADDR workspace, GM_ADDR tiling)
+__global__ __aicore__ void conv2d_silu(
+    GM_ADDR x, GM_ADDR filter, GM_ADDR bias, GM_ADDR y,
+    GM_ADDR workspace, GM_ADDR tiling)
 {
     REGISTER_TILING_DEFAULT(Conv2dSiluTilingData);
     GET_TILING_DATA_WITH_STRUCT(Conv2dSiluTilingData, tilingData, tiling);
 
-    // 场景1
-    if constexpr (schMode == static_cast<uint32_t>(Conv2dSiluTilingKey::TILING_KEY_EXAMPLE_FLOAT)) {
-        NsConv2dSilu::Conv2dSilu<float> op; // 算子kernel实例获取
-        op.Init(x, y, z, &tilingData);      // 算子kernel实例初始化
-        op.Process();                       // 算子kernel实例执行
-    }
-
-    // 场景2
-    if constexpr (schMode == static_cast<uint32_t>(Conv2dSiluTilingKey::TILING_KEY_EXAMPLE_INT32)) {
-        NsConv2dSilu::Conv2dSilu<int32_t> op; // 算子kernel实例获取
-        op.Init(x, y, z, &tilingData);        // 算子kernel实例初始化
-        op.Process();                         // 算子kernel实例执行
+    if constexpr (schMode == CONV2D_SILU_SCH_FP16) {
+        
+    } else if constexpr (schMode == CONV2D_SILU_SCH_FP32) {
+        
     }
 }

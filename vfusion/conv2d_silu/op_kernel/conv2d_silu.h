@@ -10,70 +10,57 @@
 
 /*!
  * \file conv2d_silu.h
- * \brief
+ * \brief Catlass-based Conv2d + Bias + SiLU kernel (Atlas A2)
+ *        Support Element type: half / bfloat16_t / float
  */
+
 #ifndef __CONV2D_SILU_H__
 #define __CONV2D_SILU_H__
+
+#ifndef K_MAX_SHAPE_DIM
+#define K_MAX_SHAPE_DIM 0
+#endif
 
 #include "kernel_operator.h"
 #include "kernel_tiling/kernel_tiling.h"
 #include "conv2d_silu_tiling_data.h"
 #include "conv2d_silu_tiling_key.h"
+#include "conv2d_silu_kernel_template.h"
+
 
 namespace NsConv2dSilu {
 
-using namespace AscendC;
-
-constexpr int32_t BUFFER_NUM = 2;
-
-template <typename T>
-class Conv2dSilu {
+template<typename ElementType>
+struct Conv2dSiluKernel : Conv2dSiluKernelTraits<ElementType> {
 public:
-    __aicore__ inline Conv2dSilu(){};
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR filter, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
+    const Conv2dSiluTilingData* tiling) 
+    {
+        // 告诉框架这是系统 workspace（含硬件同步相关区域）
+        SetSysWorkspace(workspace);
+        // 用户自己用的中间结果区域
+        GM_ADDR userWs = GetUserWorkspace(workspace);
 
-    __aicore__ inline void Init(/*参数列表*/);
-    __aicore__ inline void Process(/*参数列表*/);
+        GET_TILING_DATA(tilingData, tiling);
+    }
+
+    __aicore__ inline void Process()
+    {}
 
 private:
-    __aicore__ inline void CopyIn(/*参数列表*/);
-    __aicore__ inline void CopyOut(/*参数列表*/);
-    __aicore__ inline void Compute(/*参数列表*/);
-
-private:
-    TPipe pipe;
-    TQue<QuePosition::VECIN, BUFFER_NUM> XXX;
-    TQue<QuePosition::VECOUT, BUFFER_NUM> YYY;
+    __aicore__ inline Catlass::Conv2dParams MakeProblemParams(const Conv2dSiluTilingData* t)
+    {
+        uint32_t dataSizes[5] = {t->batch, t->hi, t->wi, t->cin, t->cout};
+        uint8_t filterSizes[2] = {static_cast<uint8_t>(t->kh), static_cast<uint8_t>(t->kw)};
+        uint8_t pads[4] = {
+            static_cast<uint8_t>(t->padLeft), static_cast<uint8_t>(t->padRight),
+            static_cast<uint8_t>(t->padTop), static_cast<uint8_t>(t->padBottom)};
+        uint8_t strides[2] = {static_cast<uint8_t>(t->strideH), static_cast<uint8_t>(t->strideW)};
+        uint8_t dilations[2] = {static_cast<uint8_t>(t->dilationH), static_cast<uint8_t>(t->dilationW)};
+        return Catlass::Conv2dParams::MakeConv2dParams(dataSizes, filterSizes, pads, strides, dilations);
+    }
 };
 
-template <typename T>
-__aicore__ inline void Conv2dSilu<T>::Init(/*参数列表*/)
-{
-}
-
-template <typename T>
-__aicore__ inline void Conv2dSilu<T>::CopyIn(/*参数列表*/)
-{
-}
-
-template <typename T>
-__aicore__ inline void Conv2dSilu<T>::CopyOut(/*参数列表*/)
-{
-}
-
-template <typename T>
-__aicore__ inline void Conv2dSilu<T>::Compute(/*参数列表*/)
-{
-}
-
-template <typename T>
-__aicore__ inline void Conv2dSilu<T>::Process()
-{
-    for (int32_t i = 0; i < /*循环次数*/; i++) {
-        CopyIn(/*参数列表*/);
-        Compute(/*参数列表*/);
-        CopyOut(/*参数列表*/);
-    }
-}
-
 } // namespace NsConv2dSilu
-#endif // CONV2D_SILU_H
+
+#endif

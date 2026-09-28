@@ -9,37 +9,68 @@
  */
 
 /*!
- * \file conv2d_silu.cpp
- * \brief
+ * \file conv2d_silu_def.cpp
+ * \brief Conv2d + Bias + SiLU fused op definition (Ascend910B)
+ *        Support dtype: FP16 / BF16 / FP32
  */
+
 #include "register/op_def_registry.h"
 
 namespace ops {
+
 class Conv2dSilu : public OpDef {
 public:
     explicit Conv2dSilu(const char* name) : OpDef(name)
     {
-        // 输入参数说明
-        this->Input("x1")                                       // 输入x1定义
-            .ParamType(REQUIRED)                                // 必选输入
-            .DataType({ge::DT_FLOAT, ge::DT_INT32})             // 支持数据类型
-            .Format({ge::FORMAT_ND, ge::FORMAT_ND})             // 支持format格式
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND}) // 未确定大小shape对应format格式
-            .AutoContiguous();                                  // 内存自动连续化
-        
-        /* ...此处补充其他输入输出参数说明 */
-
-        // 输出参数说明
-        this->Output("y") // 输出y定义
+        // x: NCHW, FP16 / BF16 / FP32
+        this->Input("x")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT, ge::DT_INT32})
+            .DataType({ge::DT_FLOAT16, ge::DT_FLOAT})
+            .Format({ge::FORMAT_NCHW, ge::FORMAT_NCHW})
+            .UnknownShapeFormat({ge::FORMAT_NCHW, ge::FORMAT_NCHW});
+
+        // filter: NCHW (Cout, Cin/groups, Kh, Kw)
+        this->Input("filter")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16, ge::DT_FLOAT})
+            .Format({ge::FORMAT_NCHW, ge::FORMAT_NCHW})
+            .UnknownShapeFormat({ge::FORMAT_NCHW, ge::FORMAT_NCHW});
+
+        // bias: optional 1-D
+        this->Input("bias")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT16, ge::DT_FLOAT})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND})
-            .AutoContiguous();
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
+
+        // y: NCHW
+        this->Output("y")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16, ge::DT_FLOAT})
+            .Format({ge::FORMAT_NCHW, ge::FORMAT_NCHW})
+            .UnknownShapeFormat({ge::FORMAT_NCHW, ge::FORMAT_NCHW});
+
+        this->Attr("strides").AttrType(REQUIRED).ListInt();
+        this->Attr("pads").AttrType(OPTIONAL).ListInt({0, 0, 0, 0});
+        this->Attr("dilations").AttrType(OPTIONAL).ListInt({1, 1, 1, 1});
+        this->Attr("groups").AttrType(OPTIONAL).Int(1);
+        this->Attr("data_format").AttrType(OPTIONAL).String("NCHW");
 
         OpAICoreConfig aicoreConfig;
+        aicoreConfig.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("opFile.value", "conv2d_silu")
+            .ExtendCfgInfo("opInterface.value", "conv2dsilu")
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn");
+
         this->AICore().AddConfig("ascend910b", aicoreConfig);
     }
 };
-OP_ADD(Conv2dSilu); // 添加算子信息库
+
+OP_ADD(Conv2dSilu);
+
 } // namespace ops

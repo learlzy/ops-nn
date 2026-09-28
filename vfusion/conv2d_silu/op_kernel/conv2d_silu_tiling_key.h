@@ -10,7 +10,7 @@
 
 /*!
  * \file conv2d_silu_tiling_key.h
- * \brief conv2d_silu tiling key declare
+ * \brief Tiling key for Conv2dSilu
  */
 
 #ifndef __CONV2D_SILU_TILING_KEY_H__
@@ -18,18 +18,23 @@
 
 #include "ascendc/host_api/tiling/template_argument.h"
 
-/* Mode场景定义 */
-#define ELEMENTWISE_TPL_SCH_MODE_0 0
-#define ELEMENTWISE_TPL_SCH_MODE_1 1
-/* 继续定义其他Mode场景... */
+enum class Conv2dSiluTilingKey : uint32_t {
+    TILING_KEY_FP16 = 0,
+    TILING_KEY_FP32 = 1,
+};
 
-/* 模板参数 */
+#define CONV2D_SILU_SCH_MODE_FP16 0
+#define CONV2D_SILU_SCH_MODE_FP32 1
+
 ASCENDC_TPL_ARGS_DECL(
     Conv2dSilu,
-    ASCENDC_TPL_UINT_DECL(schMode, 1, ASCENDC_TPL_UI_LIST, ELEMENTWISE_TPL_SCH_MODE_0, ELEMENTWISE_TPL_SCH_MODE_1));
+    ASCENDC_TPL_UINT_DECL(schMode, 2, ASCENDC_TPL_UI_LIST,
+                          CONV2D_SILU_SCH_MODE_FP16,
+                          CONV2D_SILU_SCH_MODE_FP32));
 
-/* 模板参数组合 */
 ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(
-    ASCENDC_TPL_UINT_SEL(schMode, ASCENDC_TPL_UI_LIST, ELEMENTWISE_TPL_SCH_MODE_0, ELEMENTWISE_TPL_SCH_MODE_1)));
+    ASCENDC_TPL_UINT_SEL(schMode, ASCENDC_TPL_UI_LIST,
+                         CONV2D_SILU_SCH_MODE_FP16,
+                         CONV2D_SILU_SCH_MODE_FP32)));
 
-#endif
+#endif // __CONV2D_SILU_TILING_KEY_H__
