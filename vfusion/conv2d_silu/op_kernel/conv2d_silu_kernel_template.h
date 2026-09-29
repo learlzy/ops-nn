@@ -11,19 +11,19 @@
 #ifndef __CONV2D_SILU_KERNEL_TEMPLATE_H__
 #define __CONV2D_SILU_KERNEL_TEMPLATE_H__
 
-#include "include/catlass/arch/arch.hpp"
-#include "include/catlass/catlass.hpp"
-#include "include/catlass/conv/block/block_conv.hpp"
-#include "include/catlass/conv/block/block_swizzle.hpp"
-#include "include/catlass/conv/dispatch_policy.hpp"
-#include "include/catlass/conv/kernel/conv2d_epilogue.hpp"
-#include "include/catlass/conv_coord.hpp"
-#include "include/catlass/gemm/gemm_type.hpp"
-#include "include/catlass/layout/layout.hpp"
-#include "include/catlass/epilogue/block/block_epilogue.hpp"
-#include "include/catlass/epilogue/tile/tile_copy.hpp"
-#include "include/catlass/epilogue/tile/tile_elemwise_silu.hpp"
-#include "include/catlass/epilogue/dispatch_policy.hpp"
+#include "catlass/arch/arch.hpp"
+#include "catlass/catlass.hpp"
+#include "catlass/conv/block/block_conv.hpp"
+#include "catlass/conv/block/block_swizzle.hpp"
+#include "catlass/conv/dispatch_policy.hpp"
+#include "catlass/conv/kernel/conv2d_epilogue.hpp"
+#include "catlass/conv_coord.hpp"
+#include "catlass/gemm/gemm_type.hpp"
+#include "catlass/layout/layout.hpp"
+#include "catlass/epilogue/block/block_epilogue.hpp"
+#include "catlass/epilogue/tile/tile_copy.hpp"
+#include "catlass/epilogue/tile/tile_elemwise_silu.hpp"
+#include "catlass/epilogue/dispatch_policy.hpp"
 
 namespace NsConv2dSilu {
 
